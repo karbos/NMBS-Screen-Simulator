@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NMBS Vertrekbord Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage">
+    <div id="board" class="board" aria-label="Vertrekbord">
+      <header class="board-header">
+        <div class="board-clock" id="boardClock">--:--</div>
+        <div class="board-title" id="boardTitle">Vertrek</div>
+        <div class="board-logo" id="boardLogo" aria-label="NMBS">
+          <svg viewBox="0 0 64 44" width="64" height="44" aria-hidden="true">
+            <ellipse cx="32" cy="22" rx="29" ry="19" fill="none" stroke="#fff" stroke-width="3.5"/>
+            <path fill="#fff" d="M24 10h10.5c5.2 0 8.3 2.6 8.3 6.4 0 2.6-1.5 4.4-3.7 5.2 2.9.7 4.8 2.8 4.8 5.8 0 4.3-3.4 6.6-9 6.6H24V10zm6 4.6v5.6h3.6c2 0 3.1-1 3.1-2.8s-1.1-2.8-3.1-2.8H30zm0 10v5.8h4.2c2.2 0 3.4-1.1 3.4-2.9s-1.2-2.9-3.4-2.9H30z"/>
+          </svg>
+        </div>
+      </header>
+      <div class="board-rows" id="boardRows"></div>
+    </div>
+  </main>
+
+  <button id="panelToggle" class="panel-toggle" title="Instellingen (toets P)" aria-label="Instellingen">⚙</button>
+
+  <aside id="panel" class="panel">
+    <div class="panel-head">
+      <h1>Vertrekbord instellingen</h1>
+      <div class="panel-head-actions">
+        <button id="btnFullscreen" title="Volledig scherm (toets F)">⛶</button>
+        <button id="btnClosePanel" title="Paneel sluiten (toets P)">✕</button>
+      </div>
+    </div>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="trains">Treinen</button>
+      <button class="tab" data-tab="general">Algemeen</button>
+      <button class="tab" data-tab="clock">Klok &amp; auto</button>
+      <button class="tab" data-tab="colors">Kleuren</button>
+      <button class="tab" data-tab="data">Data</button>
+    </nav>
+
+    <section class="tab-page active" data-page="trains">
+      <div class="btn-row">
+        <button id="btnAddTrain" class="primary">+ Trein</button>
+        <button id="btnRandomTrain">🎲 Willekeurig</button>
+        <button id="btnSort">Sorteer op tijd</button>
+        <button id="btnShiftNow" title="Verschuif alle tijden zodat de eerste trein binnen enkele minuten vertrekt">Tijden → nu</button>
+        <button id="btnClearTrains" class="danger">Alles wissen</button>
+      </div>
+      <div id="trainList" class="train-list"></div>
+    </section>
+
+    <section class="tab-page" data-page="general">
+      <label class="field">Titel (leeg = automatisch volgens taal)
+        <input type="text" data-setting="title" placeholder="Vertrek">
+      </label>
+      <label class="field">Taal
+        <select data-setting="language">
+          <option value="nl">Nederlands</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+          <option value="nl-fr">Wisselen NL / FR</option>
+          <option value="nl-fr-de-en">Wisselen NL / FR / DE / EN</option>
+        </select>
+      </label>
+      <label class="field">Wisselinterval taal (seconden)
+        <input type="number" min="2" max="120" data-setting="cycleInterval">
+      </label>
+      <label class="field">Aantal rijen op het scherm
+        <input type="number" min="3" max="14" data-setting="rowsVisible">
+      </label>
+      <label class="check"><input type="checkbox" data-setting="showLogo"> NMBS-logo tonen</label>
+      <label class="check"><input type="checkbox" data-setting="showSeconds"> Seconden tonen in klok</label>
+      <label class="check"><input type="checkbox" data-setting="blinkColon"> Knipperende dubbele punt</label>
+      <label class="check"><input type="checkbox" data-setting="marquee"> Lange teksten laten scrollen</label>
+      <label class="check"><input type="checkbox" data-setting="showViaWord"> Woord "via" automatisch toevoegen</label>
+      <label class="check"><input type="checkbox" data-setting="alternateRows"> Afwisselende rijkleuren</label>
+      <label class="check"><input type="checkbox" data-setting="showEmptyRows"> Lege rijen tonen</label>
+    </section>
+
+    <section class="tab-page" data-page="clock">
+      <h2>Klok</h2>
+      <label class="field">Klokmodus
+        <select data-setting="clockMode">
+          <option value="live">Live (systeemtijd)</option>
+          <option value="offset">Live met verschuiving</option>
+          <option value="custom">Eigen tijd (simulatie)</option>
+        </select>
+      </label>
+      <label class="field" data-show-if="clockMode=offset">Verschuiving (minuten, mag negatief)
+        <input type="number" step="1" data-setting="clockOffset">
+      </label>
+      <div data-show-if="clockMode=custom">
+        <label class="field">Starttijd
+          <input type="time" step="1" data-setting="customStart">
+        </label>
+        <label class="field">Snelheid
+          <select data-setting="clockSpeed">
+            <option value="0">Bevroren (0×)</option>
+            <option value="1">Normaal (1×)</option>
+            <option value="2">2×</option>
+            <option value="5">5×</option>
+            <option value="10">10×</option>
+            <option value="30">30×</option>
+            <option value="60">60× (1 min/s)</option>
+          </select>
+        </label>
+        <button id="btnRestartClock">Klok herstarten vanaf starttijd</button>
+      </div>
+
+      <h2>Automatisch</h2>
+      <label class="check"><input type="checkbox" data-setting="autoDepart"> Treinen verdwijnen na vertrek</label>
+      <label class="field">Blijft nog zichtbaar na vertrek (minuten)
+        <input type="number" min="0" max="30" data-setting="departGrace">
+      </label>
+      <label class="check"><input type="checkbox" data-setting="autoFill"> Bord automatisch aanvullen met nieuwe treinen</label>
+      <label class="check"><input type="checkbox" data-setting="autoSort"> Automatisch sorteren op tijd</label>
+      <label class="field">"Komt aan" automatisch tonen (minuten vóór vertrek, 0 = uit)
+        <input type="number" min="0" max="30" data-setting="autoArriving">
+      </label>
+    </section>
+
+    <section class="tab-page" data-page="colors">
+      <div class="color-grid">
+        <label>Kopbalk <input type="color" data-color="header"></label>
+        <label>Rij (oneven) <input type="color" data-color="rowA"></label>
+        <label>Rij (even) <input type="color" data-color="rowB"></label>
+        <label>Scheidingslijn <input type="color" data-color="separator"></label>
+        <label>Bestemming <input type="color" data-color="dest"></label>
+        <label>Tekst <input type="color" data-color="text"></label>
+        <label>Vertraging / beperkt <input type="color" data-color="alert"></label>
+        <label>Komt aan / info <input type="color" data-color="info"></label>
+        <label>Nieuwe tijd vak <input type="color" data-color="newTimeBg"></label>
+        <label>Nieuwe tijd tekst <input type="color" data-color="newTimeText"></label>
+        <label>Spoorwijziging <input type="color" data-color="platformChange"></label>
+      </div>
+      <button id="btnResetColors">Standaardkleuren herstellen</button>
+    </section>
+
+    <section class="tab-page" data-page="data">
+      <p class="hint">Alle instellingen worden automatisch in je browser bewaard.</p>
+      <div class="btn-row">
+        <button id="btnExport">Exporteren (JSON)</button>
+        <button id="btnImport">Importeren</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <div class="btn-row">
+        <button id="btnReset" class="danger">Alles terugzetten naar standaard</button>
+      </div>
+      <h2>Sneltoetsen</h2>
+      <ul class="hint">
+        <li><kbd>P</kbd> paneel tonen/verbergen</li>
+        <li><kbd>F</kbd> volledig scherm</li>
+        <li><kbd>R</kbd> willekeurige trein toevoegen</li>
+      </ul>
+      <p class="hint">Tip: open de pagina met <code>#display</code> achter de URL om het paneel standaard te verbergen.</p>
+    </section>
+  </aside>
+
+  <template id="trainTemplate">
+    <div class="train-card">
+      <div class="train-card-head">
+        <span class="train-card-title"></span>
+        <div class="train-card-actions">
+          <button data-action="up" title="Omhoog">▲</button>
+          <button data-action="down" title="Omlaag">▼</button>
+          <button data-action="duplicate" title="Dupliceren">⧉</button>
+          <button data-action="delete" title="Verwijderen" class="danger">✕</button>
+        </div>
+      </div>
+      <div class="train-grid">
+        <label>Tijd <input type="time" data-field="time"></label>
+        <label>Spoor <input type="text" data-field="platform" maxlength="4"></label>
+        <label>Type <input type="text" data-field="type" maxlength="5" list="typeList"></label>
+        <label class="span3">Bestemming <input type="text" data-field="dest"></label>
+        <label class="span3">Via <input type="text" data-field="via" placeholder="Halle, Bergen"></label>
+        <label class="span3">Opmerking (vervangt via-regel) <input type="text" data-field="remark" placeholder="Rijdt niet verder dan Brugge"></label>
+        <label>Vertraging (min) <input type="number" min="0" max="999" data-field="delay"></label>
+        <label>Verwachte tijd <input type="time" data-field="expected" title="Leeg = tijd + vertraging"></label>
+        <label>Icoon
+          <select data-field="icon">
+            <option value="">Geen (tekst)</option>
+            <option value="int">Internationaal</option>
+          </select>
+        </label>
+        <label>Status
+          <select data-field="status">
+            <option value="">Geen</option>
+            <option value="arriving">Komt aan</option>
+            <option value="limited">Beperkt</option>
+            <option value="cancelled">Afgeschaft</option>
+            <option value="custom">Eigen tekst…</option>
+          </select>
+        </label>
+        <label>Eigen status <input type="text" data-field="customStatus" maxlength="18"></label>
+        <label>Statuskleur <input type="color" data-field="customColor"></label>
+        <label class="check span3"><input type="checkbox" data-field="platformChanged"> Spoorwijziging markeren</label>
+      </div>
+    </div>
+  </template>
+
+  <datalist id="typeList">
+    <option value="IC"><option value="L"><option value="P"><option value="S1"><option value="S2">
+    <option value="S3"><option value="S4"><option value="S5"><option value="S6"><option value="S7">
+    <option value="S8"><option value="S9"><option value="S10"><option value="EC"><option value="ICE">
+    <option value="TGV"><option value="EUR"><option value="EXTRA">
+  </datalist>
+
+  <script src="app.js"></script>
+</body>
+</html>
