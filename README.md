@@ -3,10 +3,14 @@
 Een volledig instelbare simulatie van het vertrekbord van de NMBS/SNCB in Belgische stations.
 
 Open `index.html` in een browser; er is geen build of server nodig.
+Voor de live gegevens is een internetverbinding nodig (tab **Live** → *Gegevensbron: Live NMBS-gegevens*).
 
 ## Functies
 
-- **Live klok** linksboven (systeemtijd, met verschuiving, of een eigen simulatietijd met instelbare snelheid).
+- **Live klok** linksboven in Belgische tijd (live, met verschuiving, of een eigen simulatietijd met instelbare snelheid).
+- **Live NMBS-gegevens** via de open [iRail API](https://docs.irail.be): kies een willekeurig station,
+  vertrek- of aankomstbord, en filter eventueel op één of meer sporen (perronscherm). Toont echte tijden,
+  vertragingen, sporen, spoorwijzigingen, afgeschafte treinen en via-stations, en ververst automatisch.
 - **Treinen bewerken**: tijd, bestemming, via, opmerking, spoor, type (IC, S1, P, …), internationaal icoon,
   vertraging met nieuwe verwachte tijd, status (*Komt aan*, *Beperkt*, *Afgeschaft* of eigen tekst) en spoorwijziging.
 - **Automatische simulatie**: treinen verdwijnen na vertrek, het bord vult zich aan met willekeurige treinen,

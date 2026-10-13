@@ -39,6 +39,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="trains">Treinen</button>
+      <button class="tab" data-tab="live">Live</button>
       <button class="tab" data-tab="general">Algemeen</button>
       <button class="tab" data-tab="clock">Klok &amp; auto</button>
       <button class="tab" data-tab="colors">Kleuren</button>
@@ -53,7 +54,45 @@
         <button id="btnShiftNow" title="Verschuif alle tijden zodat de eerste trein binnen enkele minuten vertrekt">Tijden → nu</button>
         <button id="btnClearTrains" class="danger">Alles wissen</button>
       </div>
+      <p class="hint note" data-show-if="source=live">Live-modus staat aan: deze lijst wordt bij elke verversing overschreven met de echte NMBS-gegevens.</p>
       <div id="trainList" class="train-list"></div>
+    </section>
+
+    <section class="tab-page" data-page="live">
+      <label class="field">Gegevensbron
+        <select data-setting="source">
+          <option value="manual">Handmatig / simulatie</option>
+          <option value="live">Live NMBS-gegevens (iRail)</option>
+        </select>
+      </label>
+      <div data-show-if="source=live">
+        <label class="field">Station
+          <input type="text" id="liveStation" list="stationList" autocomplete="off" placeholder="Typ een stationsnaam…">
+        </label>
+        <datalist id="stationList"></datalist>
+        <label class="field">Bord
+          <select data-setting="liveArrdep">
+            <option value="departure">Vertrek</option>
+            <option value="arrival">Aankomst</option>
+          </select>
+        </label>
+        <label class="field">Alleen deze sporen (leeg = alle, bv. "3" of "11, 12")
+          <input type="text" data-setting="livePlatforms" placeholder="alle sporen">
+        </label>
+        <label class="field">Aantal via-stations (0 = geen)
+          <input type="number" min="0" max="6" data-setting="liveVia">
+        </label>
+        <label class="field">Verversen elke … seconden (min. 30)
+          <input type="number" min="30" max="600" step="10" data-setting="liveRefresh">
+        </label>
+        <label class="check"><input type="checkbox" data-setting="liveHideLeft"> Vertrokken treinen verbergen</label>
+        <label class="check"><input type="checkbox" data-setting="liveShowStation"> Stationsnaam in kopbalk tonen</label>
+        <div class="btn-row"><button id="btnLiveRefresh" class="primary">Nu verversen</button></div>
+      </div>
+      <p id="liveStatus" class="live-status"></p>
+      <p class="hint">Gegevens: de open <a href="https://docs.irail.be" target="_blank" rel="noopener">iRail API</a>
+        met de realtime-informatie van de NMBS (vertrektijden, vertragingen, sporen, spoorwijzigingen en afgeschafte treinen).
+        Stations- en treinnamen volgen de gekozen taal. Een internetverbinding is nodig.</p>
     </section>
 
     <section class="tab-page" data-page="general">
@@ -89,7 +128,7 @@
       <h2>Klok</h2>
       <label class="field">Klokmodus
         <select data-setting="clockMode">
-          <option value="live">Live (systeemtijd)</option>
+          <option value="live">Live (Belgische tijd)</option>
           <option value="offset">Live met verschuiving</option>
           <option value="custom">Eigen tijd (simulatie)</option>
         </select>
@@ -213,6 +252,7 @@
     <option value="TGV"><option value="EUR"><option value="EXTRA">
   </datalist>
 
+  <script src="live.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

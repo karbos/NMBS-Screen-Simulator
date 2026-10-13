@@ -398,3 +398,13 @@ kbd {
   body.panel-open #stage { right: 0; bottom: 55vh; }
   .panel { top: auto; height: 55vh; width: 100vw; transform: translateY(100%); }
 }
+
+.live-status {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #e7eef9;
+  color: var(--ui-fg);
+}
+.live-status:empty { display: none; }
+.live-status.error { background: #fde8e7; color: #b3261e; }
+.note { background: #fff7d6; padding: 8px 10px; border-radius: 6px; color: var(--ui-fg); }

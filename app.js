@@ -42,6 +42,15 @@
     autoFill: false,
     autoSort: false,
     autoArriving: 0,
+    source: 'manual',
+    liveStationId: 'BE.NMBS.008814001',
+    liveStationName: 'Brussel-Zuid',
+    liveArrdep: 'departure',
+    liveRefresh: 60,
+    liveVia: 3,
+    livePlatforms: '',
+    liveHideLeft: true,
+    liveShowStation: false,
     colors: { ...DEFAULT_COLORS },
   };
 
@@ -91,10 +100,10 @@
   ];
 
   const LANG = {
-    nl: { title: 'Vertrek', arriving: 'Komt aan', limited: 'Beperkt', cancelled: 'Afgeschaft', via: 'via' },
-    fr: { title: 'Départ', arriving: 'Arrive', limited: 'Limité', cancelled: 'Supprimé', via: 'via' },
-    de: { title: 'Abfahrt', arriving: 'Kommt an', limited: 'Begrenzt', cancelled: 'Fällt aus', via: 'über' },
-    en: { title: 'Departure', arriving: 'Arriving', limited: 'Limited', cancelled: 'Cancelled', via: 'via' },
+    nl: { title: 'Vertrek', arrTitle: 'Aankomst',arriving: 'Komt aan', limited: 'Beperkt', cancelled: 'Afgeschaft', via: 'via' },
+    fr: { title: 'Départ', arrTitle: 'Arrivée',arriving: 'Arrive', limited: 'Limité', cancelled: 'Supprimé', via: 'via' },
+    de: { title: 'Abfahrt', arrTitle: 'Ankunft',arriving: 'Kommt an', limited: 'Begrenzt', cancelled: 'Fällt aus', via: 'über' },
+    en: { title: 'Departure', arrTitle: 'Arrival',arriving: 'Arriving', limited: 'Limited', cancelled: 'Cancelled', via: 'via' },
   };
 
   const INT_ICON = `<svg viewBox="0 0 50 50" aria-label="internationaal"><circle cx="25" cy="25" r="21" fill="none" stroke="currentColor" stroke-width="3"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M25 11v28M12.9 18l24.2 14M12.9 32l24.2-14"/></g><circle cx="25" cy="25" r="4" fill="currentColor"/></svg>`;
@@ -124,6 +133,8 @@
       customStatus: t.customStatus || '',
       customColor: t.customColor || '#1673d6',
       platformChanged: !!t.platformChanged,
+      vehicle: t.vehicle || '',
+      ts: Number(t.ts) || 0,
     };
   }
 
@@ -202,6 +213,10 @@
     }
   }
 
+  const belgianTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Brussels', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+
   /** Current simulated time as seconds of the day. */
   function getNowSeconds() {
     if (settings.clockMode === 'custom') {
@@ -212,7 +227,10 @@
     if (settings.clockMode === 'offset') {
       d = new Date(d.getTime() + (Number(settings.clockOffset) || 0) * 60000);
     }
-    return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000;
+    // Always Belgian time, so the clock matches the NMBS data wherever the page is opened.
+    const parts = {};
+    belgianTime.formatToParts(d).forEach((p) => { parts[p.type] = Number(p.value); });
+    return parts.hour * 3600 + parts.minute * 60 + parts.second + d.getMilliseconds() / 1000;
   }
 
   const nowMinutes = () => getNowSeconds() / 60;
@@ -290,7 +308,7 @@
       });
       if (trains.length !== before) changed = true;
     }
-    if (settings.autoFill) {
+    if (settings.autoFill && settings.source !== 'live') {
       let guard = 0;
       while (trains.length < settings.rowsVisible && guard++ < 20) {
         trains.push(randomTrain(nextFreeTime()));
@@ -376,7 +394,12 @@
 
     const lang = currentLang();
     const L = LANG[lang];
-    $('#boardTitle').textContent = settings.title || L.title;
+    const isArrival = settings.source === 'live' && settings.liveArrdep === 'arrival';
+    let title = settings.title || (isArrival ? L.arrTitle : L.title);
+    if (settings.source === 'live' && settings.liveShowStation && settings.liveStationName) {
+      title += ` \u2013 ${settings.liveStationName}`;
+    }
+    $('#boardTitle').textContent = title;
 
     const now = nowMinutes();
     const visible = trains.slice(0, n);
@@ -557,6 +580,10 @@
     settings[key] = v;
     if (key === 'clockMode' || key === 'customStart') anchorClock();
     if (key === 'rowsVisible') settings.rowsVisible = Math.max(3, Math.min(14, v));
+    if (key === 'source' || key === 'language' || key.startsWith('live')) {
+      // `input` and `change` both fire for selects/checkboxes; react only once.
+      if (e.type === 'change' || (el.type !== 'checkbox' && el.tagName !== 'SELECT')) onLiveSettingChange(key);
+    }
     updateShowIf();
     save();
     if (simulate()) refreshEditorSoon();
@@ -632,6 +659,10 @@
       if (e.target.dataset.setting) onSettingChange(e);
     });
 
+    $('#liveStation').addEventListener('change', onStationChange);
+    $('#liveStation').addEventListener('focus', loadStations);
+    $('#btnLiveRefresh').addEventListener('click', refreshLive);
+
     $('#btnRestartClock').addEventListener('click', () => { anchorClock(); renderClock(); });
     $('#btnResetColors').addEventListener('click', () => {
       settings.colors = { ...DEFAULT_COLORS };
@@ -697,6 +728,146 @@
     renderEditor();
     renderBoard();
     renderClock();
+    $('#liveStation').value = settings.liveStationName;
+    onLiveSettingChange('source');
+  }
+
+  // ---------- Live data (iRail) ----------
+  const live = { timer: null, debounce: null, generation: 0, stations: [], stationsLang: '' };
+
+  const liveLang = () => (LANG[settings.language.split('-')[0]] ? settings.language.split('-')[0] : 'nl');
+
+  function setLiveStatus(text, isError = false) {
+    const el = $('#liveStatus');
+    el.textContent = text;
+    el.classList.toggle('error', isError);
+  }
+
+  async function loadStations() {
+    const lang = liveLang();
+    if (live.stationsLang === lang && live.stations.length) return;
+    try {
+      live.stations = await window.NMBSLive.getStations(lang);
+      live.stationsLang = lang;
+      $('#stationList').innerHTML = live.stations.map((st) => `<option value="${esc(st.name)}">`).join('');
+    } catch (err) {
+      setLiveStatus(`Stationslijst kon niet geladen worden: ${err.message}`, true);
+    }
+  }
+
+  function findStation(name) {
+    const q = name.trim().toLowerCase();
+    if (!q) return null;
+    return live.stations.find((st) => st.name.toLowerCase() === q)
+      || live.stations.find((st) => (st.standardname || '').toLowerCase() === q)
+      || live.stations.find((st) => st.name.toLowerCase().startsWith(q));
+  }
+
+  function onStationChange(e) {
+    const st = findStation(e.target.value);
+    if (!st) {
+      setLiveStatus(live.stations.length ? `Station "${e.target.value}" niet gevonden.` : 'Stationslijst nog niet geladen.', true);
+      return;
+    }
+    settings.liveStationId = st.id;
+    settings.liveStationName = st.name;
+    e.target.value = st.name;
+    trains = [];
+    save();
+    refreshLive();
+  }
+
+  function stopLive() {
+    live.generation++;
+    clearTimeout(live.timer);
+    clearTimeout(live.debounce);
+  }
+
+  function refreshLiveSoon() {
+    clearTimeout(live.debounce);
+    live.debounce = setTimeout(refreshLive, 600);
+  }
+
+  async function refreshLive() {
+    stopLive();
+    if (settings.source !== 'live') return;
+    const gen = live.generation;
+    setLiveStatus('Live gegevens ophalen…');
+    try {
+      const board = await window.NMBSLive.getLiveboard({
+        stationId: settings.liveStationId,
+        arrdep: settings.liveArrdep,
+        lang: liveLang(),
+      });
+      if (gen !== live.generation) return;
+      const platforms = settings.livePlatforms.split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
+      const knownVia = new Map(trains.map((t) => [`${t.vehicle}|${t.ts}`, t.via]));
+      trains = board.trains
+        .filter((t) => !(settings.liveHideLeft && t.left))
+        .filter((t) => !platforms.length || platforms.includes(t.platform.toUpperCase()))
+        .map((t) => makeTrain({ ...t, via: knownVia.get(`${t.vehicle}|${t.ts}`) || '' }));
+      if (board.station) {
+        settings.liveStationName = board.station;
+        const input = $('#liveStation');
+        if (document.activeElement !== input) input.value = board.station;
+      }
+      save();
+      refreshEditorSoon();
+      renderBoard();
+      const stamp = new Date().toLocaleTimeString('nl-BE', { timeZone: 'Europe/Brussels' });
+      setLiveStatus(`${board.station}: ${trains.length} trein(en) · bijgewerkt om ${stamp}`);
+      fillVias(gen);
+    } catch (err) {
+      if (gen === live.generation) setLiveStatus(`Fout bij ophalen live gegevens: ${err.message}`, true);
+    } finally {
+      if (gen === live.generation && settings.source === 'live') {
+        live.timer = setTimeout(refreshLive, Math.max(30, Number(settings.liveRefresh) || 60) * 1000);
+      }
+    }
+  }
+
+  /** Looks up the via stations of the visible trains, one request at a time. */
+  async function fillVias(gen) {
+    const max = Number(settings.liveVia) || 0;
+    if (max <= 0) return;
+    const todo = trains.slice(0, settings.rowsVisible).filter((t) => !t.via && t.vehicle);
+    for (const t of todo) {
+      if (gen !== live.generation) return;
+      try {
+        t.via = await window.NMBSLive.getVia({
+          vehicle: t.vehicle,
+          ts: t.ts,
+          stationId: settings.liveStationId,
+          arrdep: settings.liveArrdep,
+          lang: liveLang(),
+          max,
+        });
+        renderBoard();
+      } catch (err) { /* the via line is optional */ }
+    }
+    if (gen === live.generation && todo.length) {
+      save();
+      refreshEditorSoon();
+    }
+  }
+
+  function onLiveSettingChange(key) {
+    if (key === 'source') {
+      if (settings.source === 'live') {
+        loadStations();
+        refreshLive();
+      } else {
+        stopLive();
+        setLiveStatus('Live gegevens staan uit.');
+      }
+    } else if (settings.source === 'live') {
+      if (key === 'liveVia') trains.forEach((t) => { t.via = ''; });
+      if (key === 'language') {
+        trains.forEach((t) => { t.via = ''; });
+        loadStations();
+      }
+      refreshLiveSoon();
+    }
   }
 
   // ---------- Main loop ----------
@@ -721,6 +892,13 @@
     fitBoard();
     setPanel(location.hash !== '#display');
     if (document.fonts?.ready) document.fonts.ready.then(() => { lastBoardHTML = ''; renderBoard(); });
+    $('#liveStation').value = settings.liveStationName;
+    if (settings.source === 'live') {
+      loadStations();
+      refreshLive();
+    } else {
+      setLiveStatus('Live gegevens staan uit.');
+    }
     setInterval(tick, 250);
   }
 
