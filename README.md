@@ -19,6 +19,8 @@ Voor de live gegevens is een internetverbinding nodig (tab **Live** → *Gegeven
   scrollende lange teksten en alle kleuren.
 - Instellingen worden in de browser bewaard; exporteren/importeren als JSON.
 
+![image](.assets/1.png)
+
 ## Sneltoetsen
 
 | Toets | Actie |
