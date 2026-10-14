@@ -2,7 +2,12 @@
 
 Een volledig instelbare simulatie van het vertrekbord van de NMBS/SNCB in Belgische stations.
 
-Open `index.html` in een browser; er is geen build of server nodig.
+Er zijn twee versies:
+
+- **Webversie**: open `index.html` in een browser; er is geen build of server nodig.
+- **Desktop-app in Rust** voor Windows, macOS en Linux: zie [`desktop/README.md`](desktop/README.md).
+  Kant-en-klare downloads worden automatisch gebouwd door GitHub Actions.
+
 Voor de live gegevens is een internetverbinding nodig (tab **Live** → *Gegevensbron: Live NMBS-gegevens*).
 
 ## Functies

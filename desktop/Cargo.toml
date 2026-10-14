@@ -1,0 +1,29 @@
+[package]
+name = "nmbs-vertrekbord"
+version = "0.1.0"
+edition = "2024"
+description = "Configureerbare simulator van het NMBS-vertrekbord met live iRail-gegevens"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "nmbs-vertrekbord"
+path = "src/main.rs"
+
+[dependencies]
+egui = "0.36.2"
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10.4"
+dirs = "7.0.0"
+fastrand = "2.5.0"
+rfd = "0.17.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = { version = "3.4.2", features = ["json"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,111 @@
+name: Desktop app
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+          - name: windows-x86_64
+            os: windows-latest
+          - name: macos-universal
+            os: macos-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cargo build --release
+          mkdir -p dist/nmbs-vertrekbord
+          cp target/release/nmbs-vertrekbord dist/nmbs-vertrekbord/
+          cp README.md assets/fonts/OFL.txt dist/nmbs-vertrekbord/
+          tar -C dist -czf dist/nmbs-vertrekbord-linux-x86_64.tar.gz nmbs-vertrekbord
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo build --release
+          mkdir -p dist/nmbs-vertrekbord
+          cp target/release/nmbs-vertrekbord.exe dist/nmbs-vertrekbord/
+          cp README.md assets/fonts/OFL.txt dist/nmbs-vertrekbord/
+          cd dist && 7z a nmbs-vertrekbord-windows-x86_64.zip nmbs-vertrekbord
+
+      - name: Build (macOS universal .app)
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          APP="dist/NMBS Vertrekbord.app"
+          mkdir -p "$APP/Contents/MacOS"
+          lipo -create -output "$APP/Contents/MacOS/nmbs-vertrekbord" \
+            target/aarch64-apple-darwin/release/nmbs-vertrekbord \
+            target/x86_64-apple-darwin/release/nmbs-vertrekbord
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
+          codesign --force --deep --sign - "$APP"
+          cp README.md assets/fonts/OFL.txt dist/
+          cd dist && ditto -c -k --keepParent "NMBS Vertrekbord.app" nmbs-vertrekbord-macos-universal.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nmbs-vertrekbord-${{ matrix.name }}
+          path: |
+            desktop/dist/*.tar.gz
+            desktop/dist/*.zip
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
